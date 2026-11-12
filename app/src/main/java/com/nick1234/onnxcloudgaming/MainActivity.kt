@@ -128,7 +128,7 @@ class MainActivity : Activity() {
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            setBackgroundColor(background)
+            setBackgroundColor(backgroundColor)
             addView(page)
         }
         setContentView(scroll)
