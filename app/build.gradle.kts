@@ -14,4 +14,10 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
+
+    // Keep Java bytecode target aligned with Kotlin's JVM 17 target.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 }
