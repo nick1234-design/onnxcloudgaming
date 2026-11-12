@@ -165,7 +165,8 @@ class GameActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val thread = HandlerThread("ONNXCloudGaming-FrameMetrics").apply { start() }
             frameMetricsThread = thread
-            frameMetricsHandler = Handler(thread.looper)
+            val metricsHandler = Handler(thread.looper)
+            frameMetricsHandler = metricsHandler
 
             val refreshRate = window.decorView.display?.refreshRate?.takeIf { it > 0f } ?: 60f
             val slowFrameThresholdNs = (2_000_000_000.0 / refreshRate).toLong()
@@ -180,7 +181,7 @@ class GameActivity : Activity() {
                 }
             }
             frameMetricsListener = listener
-            window.addOnFrameMetricsAvailableListener(listener, frameMetricsHandler)
+            window.addOnFrameMetricsAvailableListener(listener, metricsHandler)
         }
 
         Log.i(TAG, "Performance monitoring started; samples every 15 seconds")
