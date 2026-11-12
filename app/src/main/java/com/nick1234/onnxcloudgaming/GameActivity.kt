@@ -1,12 +1,11 @@
 package com.nick1234.onnxcloudgaming
 
 import android.app.Activity
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -15,7 +14,9 @@ import android.widget.FrameLayout
 import android.widget.Toast
 
 class GameActivity : Activity() {
-    private lateinit var web: WebView
+    private lateinit var container: FrameLayout
+    private var web: WebView? = null
+    private var rendererRecoveryAttempted = false
 
     @Suppress("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,14 +24,23 @@ class GameActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        )
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
 
-        web = WebView(this)
+        container = FrameLayout(this)
+        setContentView(container)
+        createGameWebView(loadXbox = true)
+    }
+
+    @Suppress("SetJavaScriptEnabled")
+    private fun createGameWebView(loadXbox: Boolean) {
+        val gameWebView = WebView(this)
+        web = gameWebView
+
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(gameWebView, true)
 
-        web.settings.apply {
+        gameWebView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
@@ -39,35 +49,76 @@ class GameActivity : Activity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             userAgentString = WebSettings.getDefaultUserAgent(this@GameActivity)
         }
-        web.webViewClient = object : WebViewClient() {
+
+        gameWebView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                if (url.startsWith("https://") || url.startsWith("http://")) return false
+                return !(url.startsWith("https://") || url.startsWith("http://"))
+            }
+
+            override fun onRenderProcessGone(
+                view: WebView,
+                detail: RenderProcessGoneDetail
+            ): Boolean {
+                if (isFinishing || isDestroyed) return true
+
+                // Recover once per activity session; repeated renderer exits need diagnosis.
+                if (!rendererRecoveryAttempted) {
+                    rendererRecoveryAttempted = true
+                    container.removeView(view)
+                    view.destroy()
+                    createGameWebView(loadXbox = true)
+                    Toast.makeText(
+                        this@GameActivity,
+                        "The game browser recovered. Please try again.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        this@GameActivity,
+                        "The game browser stopped again. Exit and reopen the app.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
                 return true
             }
         }
-        web.webChromeClient = object : WebChromeClient() {
+
+        gameWebView.webChromeClient = object : WebChromeClient() {
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 super.onShowCustomView(view, callback)
                 view.systemUiVisibility = (
                     View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                )
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
             }
         }
-        setContentView(FrameLayout(this).apply { addView(web, FrameLayout.LayoutParams(-1, -1)) })
-        web.loadUrl("https://www.xbox.com/play")
-        Toast.makeText(this, "If sign-in or playback is blocked, return home and choose OPEN IN CHROME.", Toast.LENGTH_LONG).show()
+
+        container.addView(
+            gameWebView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        if (loadXbox) gameWebView.loadUrl("https://www.xbox.com/play")
     }
 
     override fun onBackPressed() {
-        if (::web.isInitialized && web.canGoBack()) web.goBack() else super.onBackPressed()
+        val currentWebView = web
+        if (currentWebView != null && currentWebView.canGoBack()) {
+            currentWebView.goBack()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {
-        if (::web.isInitialized) {
-            web.stopLoading()
-            web.destroy()
+        web?.let {
+            it.stopLoading()
+            container.removeView(it)
+            it.destroy()
         }
+        web = null
         super.onDestroy()
     }
 }
