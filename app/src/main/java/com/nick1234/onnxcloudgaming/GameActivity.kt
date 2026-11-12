@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.Looper
 import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
@@ -37,10 +36,10 @@ class GameActivity : Activity() {
     private var rendererRecoveryAttempted = false
 
     // Lightweight performance diagnostics. Sampling runs only while this activity is visible.
-    private val diagnosticsHandler = Handler(Looper.getMainLooper())
+    private var diagnosticsThread: HandlerThread? = null
+    private var diagnosticsHandler: Handler? = null
     private var previousCpuTimeMs: Long? = null
     private var previousSampleTimeMs: Long? = null
-    private var frameMetricsThread: HandlerThread? = null
     private var frameMetricsHandler: Handler? = null
     private var frameMetricsListener: Window.OnFrameMetricsAvailableListener? = null
     private val frameLock = Any()
@@ -50,9 +49,9 @@ class GameActivity : Activity() {
 
     private val performanceSampler = object : Runnable {
         override fun run() {
-            if (isFinishing || isDestroyed) return
+            val handler = diagnosticsHandler ?: return
             logPerformanceSample()
-            diagnosticsHandler.postDelayed(this, PERFORMANCE_SAMPLE_INTERVAL_MS)
+            handler.postDelayed(this, PERFORMANCE_SAMPLE_INTERVAL_MS)
         }
     }
 
@@ -159,13 +158,14 @@ class GameActivity : Activity() {
     private fun startPerformanceMonitoring() {
         previousCpuTimeMs = Process.getElapsedCpuTime()
         previousSampleTimeMs = SystemClock.elapsedRealtime()
-        diagnosticsHandler.removeCallbacks(performanceSampler)
-        diagnosticsHandler.postDelayed(performanceSampler, PERFORMANCE_SAMPLE_INTERVAL_MS)
+        if (diagnosticsThread != null) return
+        val thread = HandlerThread("ONNXCloudGaming-Diagnostics").apply { start() }
+        diagnosticsThread = thread
+        val metricsHandler = Handler(thread.looper)
+        diagnosticsHandler = metricsHandler
+        metricsHandler.postDelayed(performanceSampler, PERFORMANCE_SAMPLE_INTERVAL_MS)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val thread = HandlerThread("ONNXCloudGaming-FrameMetrics").apply { start() }
-            frameMetricsThread = thread
-            val metricsHandler = Handler(thread.looper)
             frameMetricsHandler = metricsHandler
 
             val refreshRate = window.decorView.display?.refreshRate?.takeIf { it > 0f } ?: 60f
@@ -188,7 +188,7 @@ class GameActivity : Activity() {
     }
 
     private fun stopPerformanceMonitoring() {
-        diagnosticsHandler.removeCallbacks(performanceSampler)
+        diagnosticsHandler?.removeCallbacks(performanceSampler)
         frameMetricsListener?.let { listener ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 window.removeOnFrameMetricsAvailableListener(listener)
@@ -196,8 +196,9 @@ class GameActivity : Activity() {
         }
         frameMetricsListener = null
         frameMetricsHandler = null
-        frameMetricsThread?.quitSafely()
-        frameMetricsThread = null
+        diagnosticsThread?.quitSafely()
+        diagnosticsThread = null
+        diagnosticsHandler = null
         previousCpuTimeMs = null
         previousSampleTimeMs = null
         synchronized(frameLock) {
