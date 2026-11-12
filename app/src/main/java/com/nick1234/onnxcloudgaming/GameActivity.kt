@@ -66,7 +66,7 @@ class GameActivity : Activity() {
                 Log.e(
                     TAG,
                     "WebView renderer exited: didCrash=${detail.didCrash()}, " +
-                        "priorityAtExit=${detail.rendererPriorityAtExit}"
+                        "priorityAtExit=${detail.rendererPriorityAtExit()}"
                 )
                 if (isFinishing || isDestroyed) return true
 
