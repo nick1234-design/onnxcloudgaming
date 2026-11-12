@@ -46,6 +46,24 @@ class GameActivity : Activity() {
     private var measuredFrames = 0
     private var slowFrames = 0
     private var maxFrameDurationMs = 0.0
+    private var totalGpuDurationNs = 0L
+    private var maxGpuDurationMs = 0.0
+    private var totalDrawDurationNs = 0L
+    private var maxDrawDurationMs = 0.0
+    private var totalSyncDurationNs = 0L
+    private var maxSyncDurationMs = 0.0
+
+    private data class FrameStats(
+        val frames: Int,
+        val slowFrames: Int,
+        val maxTotalMs: Double,
+        val averageGpuMs: Double,
+        val maxGpuMs: Double,
+        val averageDrawMs: Double,
+        val maxDrawMs: Double,
+        val averageSyncMs: Double,
+        val maxSyncMs: Double
+    )
 
     private val performanceSampler = object : Runnable {
         override fun run() {
@@ -173,11 +191,26 @@ class GameActivity : Activity() {
 
             val listener = Window.OnFrameMetricsAvailableListener { _, metrics, _ ->
                 val durationNs = metrics.getMetric(FrameMetrics.TOTAL_DURATION)
+                val gpuDurationNs = metrics.getMetric(FrameMetrics.GPU_DURATION)
+                val drawDurationNs = metrics.getMetric(FrameMetrics.DRAW_DURATION)
+                val syncDurationNs = metrics.getMetric(FrameMetrics.SYNC_DURATION)
                 synchronized(frameLock) {
                     measuredFrames++
                     if (durationNs > slowFrameThresholdNs) slowFrames++
                     val durationMs = durationNs / 1_000_000.0
                     if (durationMs > maxFrameDurationMs) maxFrameDurationMs = durationMs
+
+                    totalGpuDurationNs += gpuDurationNs
+                    val gpuDurationMs = gpuDurationNs / 1_000_000.0
+                    if (gpuDurationMs > maxGpuDurationMs) maxGpuDurationMs = gpuDurationMs
+
+                    totalDrawDurationNs += drawDurationNs
+                    val drawDurationMs = drawDurationNs / 1_000_000.0
+                    if (drawDurationMs > maxDrawDurationMs) maxDrawDurationMs = drawDurationMs
+
+                    totalSyncDurationNs += syncDurationNs
+                    val syncDurationMs = syncDurationNs / 1_000_000.0
+                    if (syncDurationMs > maxSyncDurationMs) maxSyncDurationMs = syncDurationMs
                 }
             }
             frameMetricsListener = listener
@@ -202,9 +235,7 @@ class GameActivity : Activity() {
         previousCpuTimeMs = null
         previousSampleTimeMs = null
         synchronized(frameLock) {
-            measuredFrames = 0
-            slowFrames = 0
-            maxFrameDurationMs = 0.0
+            resetFrameMetrics()
         }
     }
 
@@ -237,10 +268,20 @@ class GameActivity : Activity() {
         }
 
         val frameStats = synchronized(frameLock) {
-            val stats = Triple(measuredFrames, slowFrames, maxFrameDurationMs)
-            measuredFrames = 0
-            slowFrames = 0
-            maxFrameDurationMs = 0.0
+            val frameCount = measuredFrames
+            val divisor = frameCount.coerceAtLeast(1).toDouble()
+            val stats = FrameStats(
+                frames = frameCount,
+                slowFrames = slowFrames,
+                maxTotalMs = maxFrameDurationMs,
+                averageGpuMs = totalGpuDurationNs / divisor / 1_000_000.0,
+                maxGpuMs = maxGpuDurationMs,
+                averageDrawMs = totalDrawDurationNs / divisor / 1_000_000.0,
+                maxDrawMs = maxDrawDurationMs,
+                averageSyncMs = totalSyncDurationNs / divisor / 1_000_000.0,
+                maxSyncMs = maxSyncDurationMs
+            )
+            resetFrameMetrics()
             stats
         }
 
@@ -250,18 +291,37 @@ class GameActivity : Activity() {
                 Locale.US,
                 "PERF cpu_one_core_pct=%.1f app_pss_mb=%.1f system_avail_mb=%.1f " +
                     "system_total_mb=%.1f low_memory=%s thermal=%s frames=%d slow_frames=%d " +
-                    "max_frame_ms=%.1f",
+                    "max_frame_ms=%.1f gpu_avg_ms=%.2f gpu_max_ms=%.2f " +
+                    "draw_avg_ms=%.2f draw_max_ms=%.2f sync_avg_ms=%.2f sync_max_ms=%.2f",
                 cpuPercent,
                 appMemory.totalPss / 1024.0,
                 systemMemory.availMem / (1024.0 * 1024.0),
                 systemMemory.totalMem / (1024.0 * 1024.0),
                 systemMemory.lowMemory,
                 thermal,
-                frameStats.first,
-                frameStats.second,
-                frameStats.third
+                frameStats.frames,
+                frameStats.slowFrames,
+                frameStats.maxTotalMs,
+                frameStats.averageGpuMs,
+                frameStats.maxGpuMs,
+                frameStats.averageDrawMs,
+                frameStats.maxDrawMs,
+                frameStats.averageSyncMs,
+                frameStats.maxSyncMs
             )
         )
+    }
+
+    private fun resetFrameMetrics() {
+        measuredFrames = 0
+        slowFrames = 0
+        maxFrameDurationMs = 0.0
+        totalGpuDurationNs = 0L
+        maxGpuDurationMs = 0.0
+        totalDrawDurationNs = 0L
+        maxDrawDurationMs = 0.0
+        totalSyncDurationNs = 0L
+        maxSyncDurationMs = 0.0
     }
 
     private fun thermalStatusName(status: Int): String = when (status) {
