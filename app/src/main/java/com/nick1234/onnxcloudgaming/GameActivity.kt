@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -14,6 +15,9 @@ import android.widget.FrameLayout
 import android.widget.Toast
 
 class GameActivity : Activity() {
+    companion object {
+        private const val TAG = "ONNXCloudGaming"
+    }
     private lateinit var container: FrameLayout
     private var web: WebView? = null
     private var rendererRecoveryAttempted = false
@@ -59,6 +63,11 @@ class GameActivity : Activity() {
                 view: WebView,
                 detail: RenderProcessGoneDetail
             ): Boolean {
+                Log.e(
+                    TAG,
+                    "WebView renderer exited: didCrash=${detail.didCrash()}, " +
+                        "priorityAtExit=${detail.rendererPriorityAtExit}"
+                )
                 if (isFinishing || isDestroyed) return true
 
                 // Recover once per activity session; repeated renderer exits need diagnosis.
@@ -110,6 +119,16 @@ class GameActivity : Activity() {
         } else {
             super.onBackPressed()
         }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        Log.w(TAG, "GameActivity memory trim requested: level=$level")
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        Log.e(TAG, "Android reported low memory while cloud gaming")
     }
 
     override fun onDestroy() {
