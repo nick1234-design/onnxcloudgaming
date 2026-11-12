@@ -20,7 +20,7 @@ import android.widget.Toast
 class MainActivity : Activity() {
     private val green = Color.rgb(16, 124, 16)
     private val brightGreen = Color.rgb(75, 220, 95)
-    private val background = Color.rgb(8, 12, 15)
+    private val backgroundColor = Color.rgb(8, 12, 15)
     private val panel = Color.rgb(20, 27, 32)
     private val muted = Color.rgb(165, 177, 184)
 
@@ -35,7 +35,7 @@ class MainActivity : Activity() {
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 22)
-            setBackgroundColor(background)
+            setBackgroundColor(backgroundColor)
             isFocusableInTouchMode = true
         }
 
