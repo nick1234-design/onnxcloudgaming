@@ -2,6 +2,10 @@ package com.nick1234.onnxcloudgaming
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
 import android.os.Debug
@@ -17,6 +21,8 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.view.FrameMetrics
 import android.view.View
 import android.view.Window
@@ -34,6 +40,8 @@ class GameActivity : Activity() {
     private lateinit var container: FrameLayout
     private var web: WebView? = null
     private var rendererRecoveryAttempted = false
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     // Lightweight performance diagnostics. Sampling runs only while this activity is visible.
     private var diagnosticsThread: HandlerThread? = null
@@ -110,6 +118,21 @@ class GameActivity : Activity() {
                 return !(url.startsWith("https://") || url.startsWith("http://"))
             }
 
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError
+            ) {
+                if (request.isForMainFrame) {
+                    Log.w(
+                        TAG,
+                        "Main-frame network load error: code=${error.errorCode}, " +
+                            "description=${error.description}"
+                    )
+                }
+                super.onReceivedError(view, request, error)
+            }
+
             override fun onRenderProcessGone(
                 view: WebView,
                 detail: RenderProcessGoneDetail
@@ -166,11 +189,106 @@ class GameActivity : Activity() {
     override fun onResume() {
         super.onResume()
         startPerformanceMonitoring()
+        startNetworkMonitoring()
     }
 
     override fun onPause() {
         stopPerformanceMonitoring()
+        stopNetworkMonitoring()
         super.onPause()
+    }
+
+    private fun startNetworkMonitoring() {
+        if (networkCallback != null) return
+
+        val manager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        connectivityManager = manager
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                Log.i(TAG, "Network available: $network")
+            }
+
+            override fun onLost(network: Network) {
+                Log.w(TAG, "Network lost: $network")
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                capabilities: NetworkCapabilities
+            ) {
+                val internet = capabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_INTERNET
+                )
+                val validated = capabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_VALIDATED
+                )
+                val transport = when {
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                    else -> "other"
+                }
+                val metered = !capabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_NOT_METERED
+                )
+                Log.i(
+                    TAG,
+                    "Network capabilities: transport=$transport internet=$internet " +
+                        "validated=$validated metered=$metered"
+                )
+            }
+
+            override fun onUnavailable() {
+                Log.w(TAG, "Network unavailable")
+            }
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                manager.registerDefaultNetworkCallback(callback)
+            } else {
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                manager.registerNetworkCallback(request, callback)
+            }
+            networkCallback = callback
+
+            val activeNetwork = manager.activeNetwork
+            val activeCapabilities = activeNetwork?.let {
+                manager.getNetworkCapabilities(it)
+            }
+            if (activeNetwork == null || activeCapabilities == null) {
+                Log.w(TAG, "Initial network state: no active network capabilities")
+            } else {
+                val internet = activeCapabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_INTERNET
+                )
+                val validated = activeCapabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_VALIDATED
+                )
+                Log.i(
+                    TAG,
+                    "Initial network state: internet=$internet validated=$validated"
+                )
+            }
+            Log.i(TAG, "Network monitoring started")
+        } catch (exception: RuntimeException) {
+            Log.e(TAG, "Unable to register network monitoring callback", exception)
+        }
+    }
+
+    private fun stopNetworkMonitoring() {
+        val callback = networkCallback ?: return
+        try {
+            connectivityManager?.unregisterNetworkCallback(callback)
+        } catch (exception: RuntimeException) {
+            Log.w(TAG, "Unable to unregister network monitoring callback", exception)
+        }
+        networkCallback = null
+        connectivityManager = null
+        Log.i(TAG, "Network monitoring stopped")
     }
 
     private fun startPerformanceMonitoring() {
