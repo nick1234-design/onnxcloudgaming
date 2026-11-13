@@ -118,6 +118,16 @@ class GameActivity : Activity() {
                 return !(url.startsWith("https://") || url.startsWith("http://"))
             }
 
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                if (url.startsWith("https://www.xbox.com/")) {
+                    view.evaluateJavascript(
+                        StreamingSettings.buildInjectionScript(this@GameActivity),
+                        null
+                    )
+                }
+            }
+
             override fun onReceivedError(
                 view: WebView,
                 request: WebResourceRequest,

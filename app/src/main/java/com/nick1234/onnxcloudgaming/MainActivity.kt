@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -111,10 +110,16 @@ class MainActivity : Activity() {
         val help = actionButton("CONNECTION & HELP") {
             showConnectionHelp()
         }
+        val streaming = actionButton("STREAMING SETTINGS") {
+            StreamingSettings.show(this@MainActivity)
+        }
         quickActions.addView(browser, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, 48
         ).apply { rightMargin = 12 })
         quickActions.addView(help, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, 48
+        ).apply { rightMargin = 12 })
+        quickActions.addView(streaming, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, 48
         ))
         page.addView(quickActions)
