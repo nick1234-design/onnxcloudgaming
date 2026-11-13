@@ -124,6 +124,19 @@ class MainActivity : Activity() {
         ))
         page.addView(quickActions)
 
+        val nativeLabRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 10, 0, 0)
+        }
+        val nativeLab = actionButton("NATIVE ENGINE LAB (PROTOTYPE)") {
+            startActivity(Intent(this@MainActivity, NativeEnginePrototypeActivity::class.java))
+        }
+        nativeLabRow.addView(nativeLab, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, 48
+        ))
+        page.addView(nativeLabRow)
+
         val footer = label(
             "BUILT FOR THE BIG SCREEN     •     USE YOUR CONTROLLER OR TV REMOTE",
             10f, Color.rgb(105, 119, 127), true
