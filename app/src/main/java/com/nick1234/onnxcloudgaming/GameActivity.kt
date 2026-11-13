@@ -103,6 +103,16 @@ class GameActivity : Activity() {
         val gameWebView = WebView(this)
         web = gameWebView
 
+        // Keep the renderer attached to this visible activity. When the app is backgrounded,
+        // Android may lower its priority rather than competing with the foreground app.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WebView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true)
+        }
+        // Avoid allocating a pre-rasterized copy of off-screen WebView content.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            gameWebView.setOffscreenPreRaster(false)
+        }
+
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(gameWebView, true)
 
@@ -204,11 +214,15 @@ class GameActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        web?.onResume()
         startPerformanceMonitoring()
         startNetworkMonitoring()
     }
 
     override fun onPause() {
+        // Suspend WebView work while another app or the Android home screen is foregrounded.
+        // Keep the WebView alive so returning to the game does not force a reload.
+        web?.onPause()
         stopPerformanceMonitoring()
         stopNetworkMonitoring()
         super.onPause()
