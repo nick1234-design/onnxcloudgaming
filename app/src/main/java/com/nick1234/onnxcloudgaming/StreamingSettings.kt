@@ -41,7 +41,7 @@ object StreamingSettings {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val values = arrayOf("auto", "720p", "1080p")
         val labels = arrayOf("Auto (recommended)", "720p", "1080p")
-        val current = values.indexOf(prefs.getString(KEY_RESOLUTION, "auto")).coerceAtLeast(0)
+        val current = values.indexOf(prefs.getString(KEY_RESOLUTION, "auto") ?: "auto").coerceAtLeast(0)
 
         AlertDialog.Builder(activity)
             .setTitle("Target resolution")
