@@ -442,25 +442,38 @@ class GameActivity : Activity() {
             stats
         }
 
+        val appPssMb = appMemory.totalPss / 1024.0
+        val dalvikPssMb = appMemory.dalvikPss / 1024.0
+        val nativePssMb = appMemory.nativePss / 1024.0
+        val privateDirtyMb = appMemory.totalPrivateDirty / 1024.0
+        val availableMemoryMb = systemMemory.availMem / (1024.0 * 1024.0)
+
         stabilityDiagnostics.recordSample(
-            appPssMb = appMemory.totalPss / 1024.0,
-            availableMemoryMb = systemMemory.availMem / (1024.0 * 1024.0),
+            appPssMb = appPssMb,
+            availableMemoryMb = availableMemoryMb,
             lowMemory = systemMemory.lowMemory,
             thermalStatus = thermal,
-            slowFrames = frameStats.slowFrames
+            slowFrames = frameStats.slowFrames,
+            dalvikPssMb = dalvikPssMb,
+            nativePssMb = nativePssMb,
+            privateDirtyMb = privateDirtyMb
         )
 
         Log.i(
             TAG,
             String.format(
                 Locale.US,
-                "PERF cpu_one_core_pct=%.1f app_pss_mb=%.1f system_avail_mb=%.1f " +
-                    "system_total_mb=%.1f low_memory=%s thermal=%s frames=%d slow_frames=%d " +
+                "PERF cpu_one_core_pct=%.1f app_pss_mb=%.1f dalvik_pss_mb=%.1f native_pss_mb=%.1f " +
+                    "private_dirty_mb=%.1f system_avail_mb=%.1f system_total_mb=%.1f " +
+                    "low_memory=%s thermal=%s frames=%d slow_frames=%d " +
                     "max_frame_ms=%.1f gpu_avg_ms=%.2f gpu_max_ms=%.2f " +
                     "draw_avg_ms=%.2f draw_max_ms=%.2f sync_avg_ms=%.2f sync_max_ms=%.2f",
                 cpuPercent,
-                appMemory.totalPss / 1024.0,
-                systemMemory.availMem / (1024.0 * 1024.0),
+                appPssMb,
+                dalvikPssMb,
+                nativePssMb,
+                privateDirtyMb,
+                availableMemoryMb,
                 systemMemory.totalMem / (1024.0 * 1024.0),
                 systemMemory.lowMemory,
                 thermal,
@@ -511,8 +524,20 @@ class GameActivity : Activity() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        Log.w(TAG, "GameActivity memory trim requested: level=$level")
-        stabilityDiagnostics.recordEvent("Android memory trim requested: level=$level")
+        val levelName = when (level) {
+            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE -> "RUNNING_MODERATE"
+            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> "RUNNING_LOW"
+            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> "RUNNING_CRITICAL"
+            android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> "UI_HIDDEN"
+            android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> "BACKGROUND"
+            android.content.ComponentCallbacks2.TRIM_MEMORY_MODERATE -> "MODERATE"
+            android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> "COMPLETE"
+            else -> "UNKNOWN"
+        }
+        Log.w(TAG, "GameActivity memory trim requested: level=$level ($levelName)")
+        stabilityDiagnostics.recordEvent("Android memory trim: $levelName (level=$level)")
+        // Do not clear WebView caches, force garbage collection, or reload the game here.
+        // Those actions can interrupt active cloud gameplay; this phase records pressure only.
     }
 
     override fun onLowMemory() {
