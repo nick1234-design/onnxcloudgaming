@@ -130,7 +130,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 10, 0, 0)
         }
-        val nativeLab = actionButton("NATIVE ENGINE LAB (PROTOTYPE)") {
+        val nativeLab = actionButton("HARDWARE & GRAPHICS DIAGNOSTICS (PHASE 8.1)") {
             startActivity(Intent(this@MainActivity, NativeEnginePrototypeActivity::class.java))
         }
         nativeLabRow.addView(nativeLab, LinearLayout.LayoutParams(
