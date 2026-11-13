@@ -137,6 +137,19 @@ class MainActivity : Activity() {
         ))
         page.addView(nativeLabRow)
 
+        val stabilityRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 8, 0, 0)
+        }
+        val stabilityReport = actionButton("STABILITY REPORT") {
+            StabilityDiagnostics(this@MainActivity).showReport(this@MainActivity)
+        }
+        stabilityRow.addView(stabilityReport, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, 48
+        ))
+        page.addView(stabilityRow)
+
         val footer = label(
             "BUILT FOR THE BIG SCREEN     •     USE YOUR CONTROLLER OR TV REMOTE",
             10f, Color.rgb(105, 119, 127), true
