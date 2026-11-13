@@ -103,6 +103,13 @@ class GameActivity : Activity() {
         val gameWebView = WebView(this)
         web = gameWebView
 
+        // Keep the WebView on Android's normal hardware-accelerated rendering path.
+        // Do not force a separate hardware texture layer: that can increase graphics memory use.
+        gameWebView.overScrollMode = View.OVER_SCROLL_NEVER
+        gameWebView.isVerticalScrollBarEnabled = false
+        gameWebView.isHorizontalScrollBarEnabled = false
+        gameWebView.setBackgroundColor(android.graphics.Color.BLACK)
+
         // Keep the renderer attached to this visible activity. When the app is backgrounded,
         // Android may lower its priority rather than competing with the foreground app.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -204,6 +211,11 @@ class GameActivity : Activity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
+        )
+        Log.i(
+            TAG,
+            "GRAPHICS_PHASE_8_2 hardware_accelerated=${gameWebView.isHardwareAccelerated} " +
+                "layer_type=${gameWebView.layerType} over_scroll=${gameWebView.overScrollMode}"
         )
         if (loadXbox) gameWebView.loadUrl("https://www.xbox.com/play")
     }
