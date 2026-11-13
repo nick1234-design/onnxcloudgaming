@@ -9,14 +9,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Persistent, lightweight stability recorder for long cloud-gaming sessions.
- * It records diagnostics only and does not change streaming behavior.
+ * Lightweight memory and stability recorder for long cloud-gaming sessions.
+ * It observes memory pressure without clearing WebView caches or interrupting playback.
  */
 class StabilityDiagnostics(context: Context) {
     companion object {
         private const val PREFS = "onnx_stability_diagnostics"
         private const val MAX_EVENTS = 24
         private const val LOW_AVAILABLE_MEMORY_MB = 128L
+        private const val WARNING_AVAILABLE_MEMORY_MB = 256L
     }
 
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -54,9 +55,14 @@ class StabilityDiagnostics(context: Context) {
             .putLong("session_start_elapsed", SystemClock.elapsedRealtime())
             .putInt("sample_count", 0)
             .putFloat("max_app_pss_mb", 0f)
+            .putFloat("max_dalvik_pss_mb", 0f)
+            .putFloat("max_native_pss_mb", 0f)
+            .putFloat("last_app_pss_mb", 0f)
+            .putFloat("last_private_dirty_mb", 0f)
             .putLong("min_available_mb", Long.MAX_VALUE)
             .putBoolean("low_memory_reported", false)
             .putBoolean("low_available_reported", false)
+            .putBoolean("warning_available_reported", false)
             .putBoolean("thermal_reported", false)
             .putInt("last_slow_frames", 0)
             .apply()
@@ -69,15 +75,24 @@ class StabilityDiagnostics(context: Context) {
         availableMemoryMb: Double,
         lowMemory: Boolean,
         thermalStatus: String,
-        slowFrames: Int
+        slowFrames: Int,
+        dalvikPssMb: Double,
+        nativePssMb: Double,
+        privateDirtyMb: Double
     ) {
         val count = prefs.getInt("sample_count", 0) + 1
         val maxPss = maxOf(prefs.getFloat("max_app_pss_mb", 0f), appPssMb.toFloat())
+        val maxDalvik = maxOf(prefs.getFloat("max_dalvik_pss_mb", 0f), dalvikPssMb.toFloat())
+        val maxNative = maxOf(prefs.getFloat("max_native_pss_mb", 0f), nativePssMb.toFloat())
         val available = availableMemoryMb.toLong().coerceAtLeast(0L)
         val minAvailable = minOf(prefs.getLong("min_available_mb", Long.MAX_VALUE), available)
         prefs.edit()
             .putInt("sample_count", count)
             .putFloat("max_app_pss_mb", maxPss)
+            .putFloat("max_dalvik_pss_mb", maxDalvik)
+            .putFloat("max_native_pss_mb", maxNative)
+            .putFloat("last_app_pss_mb", appPssMb.toFloat())
+            .putFloat("last_private_dirty_mb", privateDirtyMb.toFloat())
             .putLong("min_available_mb", minAvailable)
             .putInt("last_slow_frames", slowFrames)
             .apply()
@@ -92,10 +107,20 @@ class StabilityDiagnostics(context: Context) {
         if (available < LOW_AVAILABLE_MEMORY_MB &&
             !prefs.getBoolean("low_available_reported", false)
         ) {
-            addEvent("Available system memory dropped below 128 MB")
+            addEvent("Critical memory pressure: available system RAM below 128 MB")
             prefs.edit().putBoolean("low_available_reported", true).apply()
         } else if (available >= LOW_AVAILABLE_MEMORY_MB) {
             prefs.edit().putBoolean("low_available_reported", false).apply()
+        }
+
+        if (available < WARNING_AVAILABLE_MEMORY_MB &&
+            available >= LOW_AVAILABLE_MEMORY_MB &&
+            !prefs.getBoolean("warning_available_reported", false)
+        ) {
+            addEvent("Memory pressure warning: available system RAM below 256 MB")
+            prefs.edit().putBoolean("warning_available_reported", true).apply()
+        } else if (available >= WARNING_AVAILABLE_MEMORY_MB) {
+            prefs.edit().putBoolean("warning_available_reported", false).apply()
         }
 
         val hot = thermalStatus == "severe" || thermalStatus == "critical" ||
@@ -156,6 +181,10 @@ class StabilityDiagnostics(context: Context) {
         val status = if (active) "Session currently active" else
             prefs.getString("last_status", "No completed session recorded")
         val maxPss = prefs.getFloat("max_app_pss_mb", 0f)
+        val maxDalvik = prefs.getFloat("max_dalvik_pss_mb", 0f)
+        val maxNative = prefs.getFloat("max_native_pss_mb", 0f)
+        val lastPss = prefs.getFloat("last_app_pss_mb", 0f)
+        val privateDirty = prefs.getFloat("last_private_dirty_mb", 0f)
         val minAvailable = prefs.getLong("min_available_mb", Long.MAX_VALUE)
         val minAvailableText = if (minAvailable == Long.MAX_VALUE) "No samples yet" else minAvailable.toString() + " MB"
         val events = prefs.getString("events", "").orEmpty()
@@ -164,11 +193,14 @@ class StabilityDiagnostics(context: Context) {
         return "Status: " + status + "\n" +
             "Session duration: " + (duration / 60000L) + " min\n" +
             "Performance samples: " + prefs.getInt("sample_count", 0) + "\n" +
+            "App memory now (PSS): " + String.format(Locale.US, "%.1f", lastPss) + " MB\n" +
             "Peak app memory (PSS): " + String.format(Locale.US, "%.1f", maxPss) + " MB\n" +
+            "Peak Dalvik / Java memory: " + String.format(Locale.US, "%.1f", maxDalvik) + " MB\n" +
+            "Peak native memory: " + String.format(Locale.US, "%.1f", maxNative) + " MB\n" +
+            "Last private dirty memory: " + String.format(Locale.US, "%.1f", privateDirty) + " MB\n" +
             "Lowest available system memory: " + minAvailableText + "\n" +
             "Last slow-frame count: " + prefs.getInt("last_slow_frames", 0) + "\n\n" +
             "Recent events:\n" + eventText + "\n\n" +
-            "Note: an interrupted session means Android did not call the normal shutdown path; " +
-            "it does not by itself identify the cause."
+            "Memory values are diagnostic estimates. No caches are cleared and playback is not interrupted."
     }
 }
