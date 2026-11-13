@@ -106,11 +106,7 @@ class GameActivity : Activity() {
         // Keep the renderer attached to this visible activity. When the app is backgrounded,
         // Android may lower its priority rather than competing with the foreground app.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WebView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true)
-        }
-        // Avoid allocating a pre-rasterized copy of off-screen WebView content.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            gameWebView.setOffscreenPreRaster(false)
+            gameWebView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true)
         }
 
         CookieManager.getInstance().setAcceptCookie(true)
