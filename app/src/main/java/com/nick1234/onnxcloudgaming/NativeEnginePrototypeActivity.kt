@@ -114,12 +114,14 @@ class NativeEnginePrototypeActivity : Activity(), SurfaceHolder.Callback {
             "Decoder query failed: ${error.javaClass.simpleName}: ${error.message}"
         }
 
+        val surfaceLine = if (surfaceAvailable) {
+            "SurfaceView: READY (${surfaceWidth}×${surfaceHeight})\n\n"
+        } else {
+            "SurfaceView: WAITING\n\n"
+        }
         return "ONNX CLOUD GAMING — NATIVE ENGINE LAB\n\n" +
             "Milestone 1: Android native surface + decoder capability check\n\n" +
-            "SurfaceView: ${if (surfaceAvailable) "READY" else "WAITING"}" +
-            if (surfaceAvailable) " (${surfaceWidth}×${surfaceHeight})\n\n"
-            else "\n\n" +
-            decoderReport + "\n\n" +
+            surfaceLine + decoderReport + "\n\n" +
             "IMPORTANT: This is a diagnostics prototype only. It does not start an " +
             "Xbox session or decode a live game stream yet. Your existing WebView " +
             "Cloud Gaming path is unchanged.\n\n" +
