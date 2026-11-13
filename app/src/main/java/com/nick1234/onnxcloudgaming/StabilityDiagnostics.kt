@@ -22,6 +22,19 @@ class StabilityDiagnostics(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     @Synchronized
+    fun recoverStaleSession() {
+        if (!prefs.getBoolean("session_active", false)) return
+        val priorStart = prefs.getLong("session_start_wall", System.currentTimeMillis())
+        val priorDuration = (System.currentTimeMillis() - priorStart).coerceAtLeast(0L)
+        prefs.edit()
+            .putBoolean("session_active", false)
+            .putString("last_status", "Interrupted (no clean session shutdown)")
+            .putLong("last_duration_ms", priorDuration)
+            .apply()
+        addEvent("Previous cloud gaming session did not close normally")
+    }
+
+    @Synchronized
     fun beginSession() {
         val nowWall = System.currentTimeMillis()
         if (prefs.getBoolean("session_active", false)) {
