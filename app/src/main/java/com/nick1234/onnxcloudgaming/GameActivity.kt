@@ -38,6 +38,7 @@ class GameActivity : Activity() {
     }
 
     private lateinit var container: FrameLayout
+    private lateinit var stabilityDiagnostics: StabilityDiagnostics
     private var web: WebView? = null
     private var rendererRecoveryAttempted = false
     private var connectivityManager: ConnectivityManager? = null
@@ -84,6 +85,8 @@ class GameActivity : Activity() {
     @Suppress("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        stabilityDiagnostics = StabilityDiagnostics(this)
+        stabilityDiagnostics.beginSession()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -151,6 +154,9 @@ class GameActivity : Activity() {
                     TAG,
                     "WebView renderer exited: didCrash=${detail.didCrash()}, " +
                         "priorityAtExit=${detail.rendererPriorityAtExit()}"
+                )
+                stabilityDiagnostics.recordEvent(
+                    "WebView renderer exited; didCrash=${detail.didCrash()}"
                 )
                 if (isFinishing || isDestroyed) return true
 
@@ -221,6 +227,7 @@ class GameActivity : Activity() {
 
             override fun onLost(network: Network) {
                 Log.w(TAG, "Network lost: $network")
+                stabilityDiagnostics.recordEvent("Network lost during gameplay")
             }
 
             override fun onCapabilitiesChanged(
@@ -413,6 +420,14 @@ class GameActivity : Activity() {
             stats
         }
 
+        stabilityDiagnostics.recordSample(
+            appPssMb = appMemory.totalPss / 1024.0,
+            availableMemoryMb = systemMemory.availMem / (1024.0 * 1024.0),
+            lowMemory = systemMemory.lowMemory,
+            thermalStatus = thermal,
+            slowFrames = frameStats.slowFrames
+        )
+
         Log.i(
             TAG,
             String.format(
@@ -475,14 +490,17 @@ class GameActivity : Activity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         Log.w(TAG, "GameActivity memory trim requested: level=$level")
+        stabilityDiagnostics.recordEvent("Android memory trim requested: level=$level")
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
         Log.e(TAG, "Android reported low memory while cloud gaming")
+        stabilityDiagnostics.recordEvent("Android onLowMemory callback received")
     }
 
     override fun onDestroy() {
+        stabilityDiagnostics.endSession()
         stopPerformanceMonitoring()
         web?.let {
             it.stopLoading()
