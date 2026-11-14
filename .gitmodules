@@ -1,0 +1,3 @@
+[submodule "vendor/XStreaming"]
+	path = vendor/XStreaming
+	url = https://github.com/Geocld/XStreaming.git
