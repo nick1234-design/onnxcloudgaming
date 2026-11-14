@@ -85,16 +85,16 @@ jobs:
           p.write_text(updated)
           PY
 
-      - name: Build native Android TV APK
+      - name: Build bundled native Android TV release APK
         working-directory: vendor/XStreaming/android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDevDebug
+          ./gradlew --no-daemon assembleProdRelease
 
       - name: Upload native APK
         uses: actions/upload-artifact@v4
         with:
-          name: onnxcloudgaming-native-phase-9-1
-          path: vendor/XStreaming/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
+          name: onnxcloudgaming-native-phase-9-1-bundled
+          path: vendor/XStreaming/android/app/build/outputs/apk/prod/release/app-prod-release.apk
           if-no-files-found: error
           retention-days: 14
