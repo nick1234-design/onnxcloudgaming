@@ -30,6 +30,8 @@ jobs:
 
       - name: Install Android SDK components
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android NDK and CMake
         run: sdkmanager "ndk;23.1.7779620" "cmake;3.22.1"
