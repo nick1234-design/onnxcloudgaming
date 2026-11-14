@@ -46,7 +46,7 @@ jobs:
         run: |
           corepack enable
           corepack prepare yarn@4.2.2 --activate
-          yarn install --immutable
+          yarn install
 
       - name: Patch upstream NDK host detection for Linux CI
         working-directory: vendor/XStreaming/android
