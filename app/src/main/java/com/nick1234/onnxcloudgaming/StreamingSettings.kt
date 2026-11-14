@@ -9,6 +9,16 @@ object StreamingSettings {
     private const val PREFS = "onnx_streaming_settings"
     private const val KEY_RESOLUTION = "target_resolution"
     private const val KEY_H264 = "prefer_h264"
+    private const val KEY_CODEC = "preferred_video_codec"
+
+    private fun selectedCodec(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_CODEC, null) ?: if (prefs.getBoolean(KEY_H264, true)) {
+            "h264"
+        } else {
+            "auto"
+        }
+    }
 
     fun show(activity: Activity) {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -18,10 +28,10 @@ object StreamingSettings {
             "1080p" -> "1080p"
             else -> "Auto"
         }
-        val codecLabel = if (prefs.getBoolean(KEY_H264, true)) {
-            "H.264 preferred"
-        } else {
-            "Automatic"
+        val codecLabel = when (selectedCodec(activity)) {
+            "h264" -> "H.264 preferred"
+            "av1" -> "AV1 preferred (experimental)"
+            else -> "Automatic"
         }
 
         AlertDialog.Builder(activity)
@@ -59,20 +69,28 @@ object StreamingSettings {
     }
 
     private fun showCodecPicker(activity: Activity) {
-        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val labels = arrayOf("H.264 preferred (recommended)", "Automatic codec order")
-        val current = if (prefs.getBoolean(KEY_H264, true)) 0 else 1
+        val values = arrayOf("h264", "av1", "auto")
+        val labels = arrayOf(
+            "H.264 preferred (recommended)",
+            "AV1 preferred (experimental)",
+            "Automatic codec order"
+        )
+        val current = values.indexOf(selectedCodec(activity)).coerceAtLeast(0)
 
         AlertDialog.Builder(activity)
             .setTitle("Video codec preference")
             .setSingleChoiceItems(labels, current) { dialog, which ->
-                prefs.edit().putBoolean(KEY_H264, which == 0).apply()
+                activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_CODEC, values[which])
+                    .apply()
                 dialog.dismiss()
-                Toast.makeText(
-                    activity,
-                    "Codec preference saved. Automatic fallback is retained.",
-                    Toast.LENGTH_LONG
-                ).show()
+                val message = when (values[which]) {
+                    "av1" -> "AV1 preference saved. It only works if Xbox offers AV1; otherwise the stream falls back."
+                    "h264" -> "H.264 preference saved. Other codecs remain available as fallback."
+                    else -> "Automatic codec order saved."
+                }
+                Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
             }
             .setNegativeButton("CANCEL", null)
             .show()
@@ -81,7 +99,7 @@ object StreamingSettings {
     fun buildInjectionScript(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val resolution = prefs.getString(KEY_RESOLUTION, "auto") ?: "auto"
-        val h264 = prefs.getBoolean(KEY_H264, true)
+        val preferredCodec = selectedCodec(context)
         val dimensions = when (resolution) {
             "720p" -> Pair(1280, 720)
             "1080p" -> Pair(1920, 1080)
@@ -99,7 +117,7 @@ object StreamingSettings {
                 return;
               }
               var original = proto.setLocalDescription;
-              var preferH264 = $h264;
+              var preferredCodec = "$preferredCodec";
               var targetWidth = $width;
               var targetHeight = $height;
 
@@ -127,26 +145,28 @@ object StreamingSettings {
                       if (fmtp) profileByPayload[fmtp[1]] = fmtp[2].toLowerCase();
                     });
 
-                    if (preferH264) {
-                      var h264Payloads = payloads.filter(function(id) {
-                        return codecByPayload[id] === "H264";
+                    if (preferredCodec === "av1" || preferredCodec === "h264") {
+                      var preferredPayloads = payloads.filter(function(id) {
+                        return codecByPayload[id] === (preferredCodec === "av1" ? "AV1" : "H264");
                       });
                       var otherPayloads = payloads.filter(function(id) {
-                        return codecByPayload[id] !== "H264";
+                        return codecByPayload[id] !== (preferredCodec === "av1" ? "AV1" : "H264");
                       });
-                      h264Payloads.sort(function(a, b) {
-                        function rank(id) {
-                          var profile = profileByPayload[id] || "";
-                          if (profile.indexOf("4d") === 0) return 0;
-                          if (profile.indexOf("42e") === 0) return 1;
-                          if (profile.indexOf("420") === 0) return 2;
-                          return 3;
-                        }
-                        return rank(a) - rank(b);
-                      });
-                      if (h264Payloads.length) {
+                      if (preferredCodec === "h264") {
+                        preferredPayloads.sort(function(a, b) {
+                          function rank(id) {
+                            var profile = profileByPayload[id] || "";
+                            if (profile.indexOf("4d") === 0) return 0;
+                            if (profile.indexOf("42e") === 0) return 1;
+                            if (profile.indexOf("420") === 0) return 2;
+                            return 3;
+                          }
+                          return rank(a) - rank(b);
+                        });
+                      }
+                      if (preferredPayloads.length) {
                         lines[videoIndex] = parts.slice(0, 3)
-                          .concat(h264Payloads, otherPayloads).join(" ");
+                          .concat(preferredPayloads, otherPayloads).join(" ");
                       }
                     }
 
@@ -180,7 +200,7 @@ object StreamingSettings {
 
               window.__onnxCloudPrefsInstalled = true;
               console.info("ONNXCloudGaming: stream preferences hook installed; resolution=" +
-                "$resolution, h264Preferred=" + preferH264);
+                "$resolution, preferredCodec=" + preferredCodec);
             })();
         """.trimIndent()
     }
