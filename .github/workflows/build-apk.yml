@@ -41,6 +41,20 @@ jobs:
         with:
           targets: armv7-linux-androideabi,aarch64-linux-android
 
+      - name: Repair malformed upstream React Native Paper patch
+        working-directory: vendor/XStreaming
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("patches/react-native-paper+5.12.5.patch")
+          s = p.read_text()
+          old = "@@ -270,7 +262,7 @@"
+          new = "@@ -270,6 +262,6 @@"
+          if old not in s:
+              raise SystemExit("Expected malformed React Native Paper patch hunk was not found.")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Install JavaScript dependencies
         working-directory: vendor/XStreaming
         run: |
