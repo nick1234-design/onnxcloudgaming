@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: yarn
-          cache-dependency-path: vendor/XStreaming/yarn.lock
 
       - name: Install Android SDK components
         uses: android-actions/setup-android@v3
