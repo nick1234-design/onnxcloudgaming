@@ -4,13 +4,14 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.os.SystemClock
+import android.provider.Settings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
  * Lightweight memory and stability recorder for long cloud-gaming sessions.
- * It observes memory pressure without clearing WebView caches or interrupting playback.
+ * It observes memory pressure and reboot/thermal clues without interrupting playback.
  */
 class StabilityDiagnostics(context: Context) {
     companion object {
@@ -20,24 +21,63 @@ class StabilityDiagnostics(context: Context) {
         private const val WARNING_AVAILABLE_MEMORY_MB = 256L
     }
 
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun currentBootCount(): Int = try {
+        Settings.Global.getInt(appContext.contentResolver, "boot_count", -1)
+    } catch (_: RuntimeException) {
+        -1
+    }
+
+    private fun thermalRank(status: String): Int = when (status) {
+        "none" -> 0
+        "light" -> 1
+        "moderate" -> 2
+        "severe" -> 3
+        "critical" -> 4
+        "emergency" -> 5
+        "shutdown" -> 6
+        else -> -1
+    }
 
     @Synchronized
     fun recoverStaleSession() {
         if (!prefs.getBoolean("session_active", false)) return
         val priorStart = prefs.getLong("session_start_wall", System.currentTimeMillis())
         val priorDuration = (System.currentTimeMillis() - priorStart).coerceAtLeast(0L)
+        val priorBootCount = prefs.getInt("session_boot_count", -1)
+        val bootCountNow = currentBootCount()
+        val rebootDetected = priorBootCount >= 0 && bootCountNow >= 0 &&
+            priorBootCount != bootCountNow
+        val status = if (rebootDetected) {
+            "Interrupted — device reboot detected"
+        } else {
+            "Interrupted (no clean session shutdown; reboot not confirmed)"
+        }
+
         prefs.edit()
             .putBoolean("session_active", false)
-            .putString("last_status", "Interrupted (no clean session shutdown)")
+            .putString("last_status", status)
             .putLong("last_duration_ms", priorDuration)
+            .putBoolean("last_reboot_detected", rebootDetected)
+            .putInt("last_session_boot_count", priorBootCount)
+            .putInt("last_observed_boot_count", bootCountNow)
             .apply()
-        addEvent("Previous cloud gaming session did not close normally")
+
+        if (rebootDetected) {
+            addEvent("DEVICE REBOOT DETECTED: boot count changed from " +
+                priorBootCount + " to " + bootCountNow)
+        } else {
+            addEvent("Previous cloud gaming session did not close normally; " +
+                "boot count did not confirm a device reboot")
+        }
     }
 
     @Synchronized
     fun beginSession() {
         val nowWall = System.currentTimeMillis()
+        val bootCount = currentBootCount()
         if (prefs.getBoolean("session_active", false)) {
             val priorStart = prefs.getLong("session_start_wall", nowWall)
             val priorDuration = (nowWall - priorStart).coerceAtLeast(0L)
@@ -53,6 +93,7 @@ class StabilityDiagnostics(context: Context) {
             .putBoolean("session_active", true)
             .putLong("session_start_wall", nowWall)
             .putLong("session_start_elapsed", SystemClock.elapsedRealtime())
+            .putInt("session_boot_count", bootCount)
             .putInt("sample_count", 0)
             .putFloat("max_app_pss_mb", 0f)
             .putFloat("max_dalvik_pss_mb", 0f)
@@ -64,9 +105,14 @@ class StabilityDiagnostics(context: Context) {
             .putBoolean("low_available_reported", false)
             .putBoolean("warning_available_reported", false)
             .putBoolean("thermal_reported", false)
+            .putString("last_thermal_status", "No samples yet")
+            .putString("peak_thermal_status", "No samples yet")
+            .putBoolean("last_reboot_detected", false)
+            .putInt("last_session_boot_count", bootCount)
+            .putInt("last_observed_boot_count", bootCount)
             .putInt("last_slow_frames", 0)
             .apply()
-        addEvent("Cloud gaming session started")
+        addEvent("Cloud gaming session started; Android boot count=" + bootCount)
     }
 
     @Synchronized
@@ -86,6 +132,12 @@ class StabilityDiagnostics(context: Context) {
         val maxNative = maxOf(prefs.getFloat("max_native_pss_mb", 0f), nativePssMb.toFloat())
         val available = availableMemoryMb.toLong().coerceAtLeast(0L)
         val minAvailable = minOf(prefs.getLong("min_available_mb", Long.MAX_VALUE), available)
+        val priorPeakThermal = prefs.getString("peak_thermal_status", "No samples yet").orEmpty()
+        val peakThermal = if (thermalRank(thermalStatus) > thermalRank(priorPeakThermal)) {
+            thermalStatus
+        } else {
+            priorPeakThermal
+        }
         prefs.edit()
             .putInt("sample_count", count)
             .putFloat("max_app_pss_mb", maxPss)
@@ -95,6 +147,8 @@ class StabilityDiagnostics(context: Context) {
             .putFloat("last_private_dirty_mb", privateDirtyMb.toFloat())
             .putLong("min_available_mb", minAvailable)
             .putInt("last_slow_frames", slowFrames)
+            .putString("last_thermal_status", thermalStatus)
+            .putString("peak_thermal_status", peakThermal)
             .apply()
 
         if (lowMemory && !prefs.getBoolean("low_memory_reported", false)) {
@@ -153,7 +207,7 @@ class StabilityDiagnostics(context: Context) {
 
     fun showReport(activity: Activity) {
         AlertDialog.Builder(activity)
-            .setTitle("Stability report")
+            .setTitle("Stability report — Phase 8.4")
             .setMessage(buildReport())
             .setPositiveButton("CLOSE", null)
             .show()
@@ -190,9 +244,24 @@ class StabilityDiagnostics(context: Context) {
         val events = prefs.getString("events", "").orEmpty()
             .split("\n").filter { it.isNotBlank() }.takeLast(8)
         val eventText = if (events.isEmpty()) "No events recorded" else events.joinToString("\n")
+        val sessionBootCount = prefs.getInt("last_session_boot_count",
+            prefs.getInt("session_boot_count", -1))
+        val observedBootCount = currentBootCount()
+        val rebootDetected = prefs.getBoolean("last_reboot_detected", false)
+        val rebootText = if (rebootDetected) {
+            "YES — boot count changed (" + sessionBootCount + " → " + observedBootCount + ")"
+        } else {
+            "Not confirmed by Android boot count"
+        }
+        val thermalLast = prefs.getString("last_thermal_status", "No samples yet")
+        val thermalPeak = prefs.getString("peak_thermal_status", "No samples yet")
+
         return "Status: " + status + "\n" +
             "Session duration: " + (duration / 60000L) + " min\n" +
             "Performance samples: " + prefs.getInt("sample_count", 0) + "\n" +
+            "Device reboot detected: " + rebootText + "\n" +
+            "Android boot count (session/current): " + sessionBootCount + " / " + observedBootCount + "\n" +
+            "Thermal status (last / peak): " + thermalLast + " / " + thermalPeak + "\n" +
             "App memory now (PSS): " + String.format(Locale.US, "%.1f", lastPss) + " MB\n" +
             "Peak app memory (PSS): " + String.format(Locale.US, "%.1f", maxPss) + " MB\n" +
             "Peak Dalvik / Java memory: " + String.format(Locale.US, "%.1f", maxDalvik) + " MB\n" +
@@ -201,6 +270,7 @@ class StabilityDiagnostics(context: Context) {
             "Lowest available system memory: " + minAvailableText + "\n" +
             "Last slow-frame count: " + prefs.getInt("last_slow_frames", 0) + "\n\n" +
             "Recent events:\n" + eventText + "\n\n" +
-            "Memory values are diagnostic estimates. No caches are cleared and playback is not interrupted."
+            "Thermal status is Android's reported device status, not a direct temperature reading. " +
+            "No caches are cleared and playback is not interrupted."
     }
 }
