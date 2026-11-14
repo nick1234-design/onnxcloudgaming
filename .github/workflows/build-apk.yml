@@ -1,30 +1,90 @@
-name: Build onnxcloudgaming APK
+name: Build ONNXCloudGaming Native (XStreaming)
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ phase-9-native-webrtc-experiment ]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-native:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout ONNXCloudGaming and XStreaming source
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          gradle-version: '8.9'
-      - name: Build debug APK
-        run: gradle assembleDebug
-      - name: Upload APK
+          node-version: '20'
+          cache: yarn
+          cache-dependency-path: vendor/XStreaming/yarn.lock
+
+      - name: Install Android SDK components
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and CMake
+        run: sdkmanager "ndk;23.1.7779620" "cmake;3.22.1"
+
+      - name: Set up Rust for native engine
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: armv7-linux-androideabi,aarch64-linux-android
+
+      - name: Install JavaScript dependencies
+        working-directory: vendor/XStreaming
+        run: |
+          corepack enable
+          corepack prepare yarn@4.2.2 --activate
+          yarn install --immutable
+
+      - name: Patch upstream NDK host detection for Linux CI
+        working-directory: vendor/XStreaming/android
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/build.gradle")
+          s = p.read_text()
+          old = '''def nanoRustHostTag = { ndkDir ->
+                  def armTag = file("${ndkDir}/toolchains/llvm/prebuilt/darwin-arm64")
+                  if (armTag.exists()) {
+                      return "darwin-arm64"
+                  }
+                  return "darwin-x86_64"
+              }'''
+          new = '''def nanoRustHostTag = { ndkDir ->
+                  def os = System.getProperty("os.name").toLowerCase()
+                  if (os.contains("mac")) {
+                      def armTag = file("${ndkDir}/toolchains/llvm/prebuilt/darwin-arm64")
+                      return armTag.exists() ? "darwin-arm64" : "darwin-x86_64"
+                  }
+                  return "linux-x86_64"
+              }'''
+          if old not in s:
+              raise SystemExit("Expected upstream NDK host-detection block was not found; refusing an unsafe patch.")
+          p.write_text(s.replace(old, new))
+          PY
+
+      - name: Build native Android TV APK
+        working-directory: vendor/XStreaming/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDevDebug
+
+      - name: Upload native APK
         uses: actions/upload-artifact@v4
         with:
-          name: onnxcloudgaming-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: onnxcloudgaming-native-phase-9-1
+          path: vendor/XStreaming/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
           if-no-files-found: error
+          retention-days: 14
