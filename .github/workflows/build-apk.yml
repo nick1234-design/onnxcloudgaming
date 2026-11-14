@@ -67,26 +67,22 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path("app/build.gradle")
           s = p.read_text()
-          old = '''def nanoRustHostTag = { ndkDir ->
+          pattern = r'def nanoRustHostTag = \{ ndkDir ->.*?\n\}'
+          replacement = '''def nanoRustHostTag = { ndkDir ->
+              def os = System.getProperty("os.name").toLowerCase()
+              if (os.contains("mac")) {
                   def armTag = file("${ndkDir}/toolchains/llvm/prebuilt/darwin-arm64")
-                  if (armTag.exists()) {
-                      return "darwin-arm64"
-                  }
-                  return "darwin-x86_64"
-              }'''
-          new = '''def nanoRustHostTag = { ndkDir ->
-                  def os = System.getProperty("os.name").toLowerCase()
-                  if (os.contains("mac")) {
-                      def armTag = file("${ndkDir}/toolchains/llvm/prebuilt/darwin-arm64")
-                      return armTag.exists() ? "darwin-arm64" : "darwin-x86_64"
-                  }
-                  return "linux-x86_64"
-              }'''
-          if old not in s:
-              raise SystemExit("Expected upstream NDK host-detection block was not found; refusing an unsafe patch.")
-          p.write_text(s.replace(old, new))
+                  return armTag.exists() ? "darwin-arm64" : "darwin-x86_64"
+              }
+              return "linux-x86_64"
+          }'''
+          updated, count = re.subn(pattern, lambda _: replacement, s, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit("Could not locate nanoRustHostTag closure; refusing to build with an unpatched Linux host tag.")
+          p.write_text(updated)
           PY
 
       - name: Build native Android TV APK
