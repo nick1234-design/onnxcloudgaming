@@ -3,7 +3,7 @@ name: Build ONNXCloudGaming Native (XStreaming)
 on:
   workflow_dispatch:
   push:
-    branches: [ phase-9-native-webrtc-experiment ]
+    branches: [ phase-3-custom-dashboard-settings ]
 
 permissions:
   contents: read
@@ -125,6 +125,12 @@ jobs:
           ))
           PY
 
+      - name: Apply ONNXCloudGaming Phase 3 settings dashboard
+        run: |
+          test -s phase-3/Settings.tsx
+          cp phase-3/Settings.tsx vendor/XStreaming/src/pages/Settings.tsx
+          grep -q "ONNXCloudGaming" vendor/XStreaming/src/pages/Settings.tsx
+
       - name: Build bundled native Android TV release APK
         working-directory: vendor/XStreaming/android
         run: |
@@ -134,7 +140,7 @@ jobs:
       - name: Upload native APK
         uses: actions/upload-artifact@v4
         with:
-          name: onnxcloudgaming-phase-2-native-engine
+          name: onnxcloudgaming-phase-3-dashboard
           path: vendor/XStreaming/android/app/build/outputs/apk/prod/release/app-prod-release.apk
           if-no-files-found: error
           retention-days: 14
