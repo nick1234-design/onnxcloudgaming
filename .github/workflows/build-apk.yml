@@ -99,6 +99,32 @@ jobs:
           p.write_text(s.replace(old, new, 1))
           PY
 
+      - name: Apply ONNXCloudGaming app identity to the native XStreaming build
+        working-directory: vendor/XStreaming
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          gradle = Path("android/app/build.gradle")
+          source = gradle.read_text()
+          pattern = r'(prod\\s*\\{\\s*dimension "environment"\\s*applicationId )"com\\.xstreaming"'
+          updated, count = re.subn(pattern, r'\\1"com.nick1234.onnxcloudgaming"', source, count=1)
+          if count != 1:
+              raise SystemExit("Could not safely locate the prod applicationId; refusing to alter the package identity.")
+          gradle.write_text(updated)
+
+          strings = Path("android/app/src/main/res/values/strings.xml")
+          xml = strings.read_text()
+          if '<string name="app_name">XStreaming</string>' not in xml:
+              raise SystemExit("Expected upstream app_name string was not found.")
+          strings.write_text(xml.replace(
+              '<string name="app_name">XStreaming</string>',
+              '<string name="app_name">ONNXCloudGaming</string>',
+              1
+          ))
+          PY
+
       - name: Build bundled native Android TV release APK
         working-directory: vendor/XStreaming/android
         run: |
@@ -108,7 +134,7 @@ jobs:
       - name: Upload native APK
         uses: actions/upload-artifact@v4
         with:
-          name: onnxcloudgaming-native-phase-9-1-bundled
+          name: onnxcloudgaming-phase-2-native-engine
           path: vendor/XStreaming/android/app/build/outputs/apk/prod/release/app-prod-release.apk
           if-no-files-found: error
           retention-days: 14
