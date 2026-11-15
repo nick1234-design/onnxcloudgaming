@@ -108,8 +108,8 @@ jobs:
 
           gradle = Path("android/app/build.gradle")
           source = gradle.read_text()
-          pattern = r'(prod\\s*\\{\\s*dimension "environment"\\s*applicationId )"com\\.xstreaming"'
-          updated, count = re.subn(pattern, r'\\1"com.nick1234.onnxcloudgaming"', source, count=1)
+          pattern = r'(prod\s*\{\s*dimension "environment"\s*applicationId )"com\.xstreaming"'
+          updated, count = re.subn(pattern, r'\1"com.nick1234.onnxcloudgaming"', source, count=1)
           if count != 1:
               raise SystemExit("Could not safely locate the prod applicationId; refusing to alter the package identity.")
           gradle.write_text(updated)
