@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +17,7 @@ const PANEL = '#151515';
 const MUTED = '#a7a7a7';
 
 function SettingsScreen({navigation}: any) {
-  const {width, height} = useWindowDimensions();
+  const {width} = useWindowDimensions();
   const [settings, setSettings] = React.useState<any>(() => getSettings());
   const [focus, setFocus] = React.useState(0);
   const wide = width >= 900;
