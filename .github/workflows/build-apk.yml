@@ -1,4 +1,4 @@
-name: Build ONNXCloudGaming Native (XStreaming)
+name: Build ONNXCloudGaming Phase 3 Dashboard
 
 on:
   workflow_dispatch:
