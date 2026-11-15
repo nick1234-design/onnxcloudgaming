@@ -91,7 +91,7 @@ function SettingsScreen({navigation}: any) {
     <View style={styles.screen}>
       <View style={styles.sidebar}>
         <View style={styles.brand}>
-          <Text style={styles.logo}>X</Text>
+          <View style={styles.logoCircle}><Text style={styles.logo}>X</Text></View>
           <Text style={styles.brandName}><Text style={{color: RED}}>ONNX</Text>CloudGaming</Text>
           <Text style={styles.tagline}>Play Xbox. Anywhere.</Text>
         </View>
@@ -110,7 +110,7 @@ function SettingsScreen({navigation}: any) {
       <View style={styles.main}>
         <View style={styles.topBar}>
           <Text style={styles.pageTitle}>⚙  Settings</Text>
-          <Text style={styles.status}>● Connected     │     🎮 Controller</Text>
+          <Text style={styles.status}>ONNXCloudGaming  │  Native Streaming</Text>
         </View>
         <ScrollView contentContainerStyle={[styles.grid, {gap: 16}]}>
           <View style={[styles.cardColumn, {width: wide ? '49%' : '100%'}]}>
@@ -147,7 +147,7 @@ function SettingsScreen({navigation}: any) {
         </ScrollView>
         <View style={styles.bottomBar}>
           <Text style={styles.footerBrand}>ⓧ  ONNXCloudGaming  ·  Powered by XStreaming</Text>
-          <Text style={styles.footerAction}>↻  Check for Updates</Text>
+          <Text style={styles.footerAction}>Settings save automatically</Text>
         </View>
       </View>
     </View>
@@ -158,7 +158,8 @@ const styles = StyleSheet.create({
   screen: {flex: 1, flexDirection: 'row', backgroundColor: '#080808'},
   sidebar: {width: '24%', minWidth: 190, maxWidth: 310, backgroundColor: '#090909', borderRightWidth: 1, borderRightColor: '#481017', paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12},
   brand: {alignItems: 'center', paddingVertical: 12, marginBottom: 18},
-  logo: {fontSize: 68, lineHeight: 78, color: RED, fontWeight: '900', textShadowColor: RED, textShadowRadius: 16},
+  logoCircle: {width: 82, height: 82, borderRadius: 41, backgroundColor: RED, alignItems: 'center', justifyContent: 'center', marginBottom: 8, shadowColor: RED, shadowRadius: 14, shadowOpacity: 0.8, elevation: 8},
+  logo: {fontSize: 65, lineHeight: 74, color: '#090909', fontWeight: '900'},
   brandName: {fontSize: 21, color: '#fff', fontWeight: '800'},
   tagline: {fontSize: 12, color: '#ddd', marginTop: 5},
   navItem: {height: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderRadius: 10, marginBottom: 6, borderWidth: 1, borderColor: 'transparent'},
