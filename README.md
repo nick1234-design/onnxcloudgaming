@@ -1,25 +1,28 @@
-# ONNXCloudGaming — Phase 2 Native Engine Integration
+# ONNXCloudGaming — Phase 3 Custom Dashboard and Settings
 
 This branch is an isolated native-streaming integration experiment for the Onn 4K Plus. The `main` branch remains untouched.
 
-## What Phase 2 changes
+## What Phase 3 changes
 
 - Builds the pinned XStreaming Android application and its native WebRTC, controller, video-decoder, and rendering components into one Android APK.
 - Changes the installed Android package ID to `com.nick1234.onnxcloudgaming`.
 - Changes the Android launcher label to **ONNXCloudGaming**.
 - Preserves the upstream React Native streaming implementation and its controller/native modules rather than routing gameplay through the Kotlin WebView screen.
 - Keeps the XStreaming source pinned as a Git submodule so the upstream origin and license notices remain traceable.
+- Replaces the upstream Settings screen at build time with the ONNXCloudGaming black-and-red, TV-oriented dashboard layout: left navigation, two-column settings cards, red focus treatment, and app branding.
+- Connects visible controls to existing XStreaming settings storage for resolution, bitrate, codec, vibration, stereo audio, IPv6, theme, and accent color; routes advanced options to the upstream setting detail screens.
+- Keeps this UI override in `phase-3/Settings.tsx`; the pinned upstream submodule itself is not modified.
 
-The existing ONNXCloudGaming Kotlin dashboard and WebView game screen are not yet merged into this React Native host. This phase establishes a single ONNXCloudGaming package containing the proven native streaming stack. The custom ONNX dashboard and any migration of settings/diagnostics are later integration work; this build must be tested before those changes.
+The existing Kotlin WebView app is still not merged into this React Native host. This phase adds the first ONNXCloudGaming-branded dashboard/settings experience inside the native XStreaming host. The broader Series X-style home screen and any additional diagnostics remain future work. Settings controls must be tested on the Onn 4K Plus; options that route to upstream setting-detail screens retain upstream behavior.
 
 ## Build
 
 1. Open the **Actions** tab.
 2. Select **Build ONNXCloudGaming Native (XStreaming)**.
 3. Run it on `phase-9-native-webrtc-experiment`.
-4. Download `onnxcloudgaming-phase-2-native-engine`.
+4. Download `onnxcloudgaming-phase-3-dashboard`.
 
-The workflow checks out the pinned submodule, installs Node/Yarn, Java, Android NDK and Rust targets, applies CI-only Linux toolchain fixes, then applies the ONNXCloudGaming Android package ID and launcher label before building the native release APK.
+The workflow checks out the pinned submodule, installs Node/Yarn, Java, Android NDK and Rust targets, applies CI-only Linux toolchain fixes, applies the ONNXCloudGaming Android package ID and launcher label, copies the Phase 3 settings screen into the XStreaming host, then builds the native release APK.
 
 ## Test checklist on the Onn 4K Plus
 
