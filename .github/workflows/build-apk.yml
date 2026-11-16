@@ -125,6 +125,25 @@ jobs:
           ))
           PY
 
+      - name: Apply ONNXCloudGaming branding assets
+        run: |
+          set -euo pipefail
+          ZIP="branding/onnxcloudgaming-build68-branding-assets.zip"
+          test -s "$ZIP"
+          mkdir -p /tmp/onnxcloudgaming-branding
+          unzip -o "$ZIP" -d /tmp/onnxcloudgaming-branding
+          SRC="/tmp/onnxcloudgaming-branding/app/src/main/res"
+          DEST="vendor/XStreaming/android/app/src/main/res"
+          test -s "$SRC/drawable-nodpi/onn_splash.png"
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            test -s "$SRC/mipmap-$density/ic_launcher.png"
+            mkdir -p "$DEST/mipmap-$density"
+            cp "$SRC/mipmap-$density/ic_launcher.png" "$DEST/mipmap-$density/ic_launcher.png"
+          done
+          mkdir -p "$DEST/drawable-nodpi"
+          cp "$SRC/drawable-nodpi/onn_splash.png" "$DEST/drawable-nodpi/screen.png"
+          echo "Applied ONNXCloudGaming launcher icons and splash screen."
+
       - name: Apply ONNXCloudGaming Phase 4 integrated settings
         run: |
           test -s phase-4/Settings.tsx
