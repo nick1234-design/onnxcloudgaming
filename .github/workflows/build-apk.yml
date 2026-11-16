@@ -169,9 +169,9 @@ jobs:
           new = "\n".join([
               "    repositories {",
               "        google()",
-              "        mavenCentral()",
               "        maven { url 'https://maven.aliyun.com/repository/google' }",
               "        maven { url 'https://maven.aliyun.com/repository/public' }",
+              "        mavenCentral()",
               "    }",
           ])
           if old not in s:
