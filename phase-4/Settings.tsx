@@ -285,7 +285,7 @@ function SettingsScreen({navigation}: any) {
         </ScrollView>
         <View style={styles.bottomBar}>
           <Text style={styles.footerBrand}>ⓧ  ONNXCloudGaming  ·  Powered by XStreaming</Text>
-          <Text style={styles.footerAction}>Settings saved automatically</Text>
+          <Text style={styles.footerAction}>Saved settings persist after restart</Text>
         </View>
       </View>
     </View>
