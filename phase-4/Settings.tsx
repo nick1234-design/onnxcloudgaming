@@ -1,12 +1,10 @@
 import React from 'react';
 import {
   DeviceEventEmitter,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import {Text} from 'react-native-paper';
 import {
@@ -17,7 +15,6 @@ import {
 import type {Settings} from '../store/settingStore';
 import pkg from '../../package.json';
 import {
-  useGamepadActiveState,
   useGamepadNavigation,
 } from '../utils/useGamepadNavigation';
 
@@ -71,9 +68,7 @@ function bitrateLabel(mode: string, bitrate: number | string) {
 }
 
 function SettingsScreen({navigation}: any) {
-  const {width} = useWindowDimensions();
   const [settings, setSettings] = React.useState<Settings>(() => getSettings());
-  const [isGamepadActive] = useGamepadActiveState(true);
   const [focus, setFocus] = React.useState<number>(FOCUS.resolution);
   const scrollRef = React.useRef<ScrollView>(null);
   // This APK targets Android TV. Keep the settings cards in one vertical column.
