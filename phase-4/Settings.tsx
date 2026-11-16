@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   DeviceEventEmitter,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +15,6 @@ import {
   SETTINGS_CHANGED_EVENT,
 } from '../store/settingStore';
 import type {Settings} from '../store/settingStore';
-import {useGamepadNavigation} from '../utils/useGamepadNavigation';
 import pkg from '../../package.json';
 
 const RED = '#ff1828';
@@ -71,7 +71,8 @@ function SettingsScreen({navigation}: any) {
   const [settings, setSettings] = React.useState<Settings>(() => getSettings());
   const [focus, setFocus] = React.useState<number>(FOCUS.resolution);
   const scrollRef = React.useRef<ScrollView>(null);
-  const wide = width >= 900;
+  // Android TV uses a single vertical focus path so the remote can move through every setting.
+  const wide = width >= 900 && !Platform.isTV;
 
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
@@ -101,31 +102,6 @@ function SettingsScreen({navigation}: any) {
     () => navigation.navigate('About'),
   ];
 
-  const focusActions: Array<() => void> = [
-    ...navActions,
-    () => openSetting('resolution'),
-    () => openSetting('xcloud_bitrate_mode'),
-    () => openSetting('codec'),
-    () => openSetting('audio_bitrate_mode'),
-    () => toggle('enable_stereo_audio'),
-    () => openSetting('theme'),
-    () => openSetting('theme_primary_color'),
-    () => toggle('vibration'),
-    () => navigation.navigate('GameMap'),
-    () => navigation.navigate('GamepadTest'),
-    () => toggle('ipv6'),
-    () => navigation.navigate('DeviceInfos'),
-    () => navigation.navigate('About'),
-  ];
-
-  useGamepadNavigation({
-    priority: 10,
-    onUp: () => setFocus(v => Math.max(0, v - 1)),
-    onDown: () => setFocus(v => Math.min(focusActions.length - 1, v + 1)),
-    onSelect: () => focusActions[focus]?.(),
-    onBack: () => navigation.goBack(),
-  });
-
   React.useEffect(() => {
     if (focus >= FOCUS.ipv6) {
       scrollRef.current?.scrollToEnd({animated: true});
@@ -153,6 +129,7 @@ function SettingsScreen({navigation}: any) {
   ) => (
     <Pressable
       focusable
+      hasTVPreferredFocus={index === FOCUS.resolution}
       accessibilityRole="button"
       onFocus={() => setFocus(index)}
       onPress={onPress}
@@ -244,6 +221,7 @@ function SettingsScreen({navigation}: any) {
         </View>
         <ScrollView
           ref={scrollRef}
+          removeClippedSubviews={false}
           contentContainerStyle={[styles.grid, {gap: 16}]}>
           <View style={[styles.cardColumn, {width: wide ? '49%' : '100%'}]}>
             {card('▣', 'Streaming Settings', 'Changes are saved to the native streaming engine', <>
