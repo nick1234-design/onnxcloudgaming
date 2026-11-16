@@ -131,6 +131,31 @@ jobs:
           cp phase-4/Settings.tsx vendor/XStreaming/src/pages/Settings.tsx
           grep -q "ONNXCloudGaming" vendor/XStreaming/src/pages/Settings.tsx
 
+      - name: Restore official Google and Maven Central repositories
+        working-directory: vendor/XStreaming/android
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("build.gradle")
+          s = p.read_text()
+          old = '''    repositories {
+//        google()
+//        mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://repo1.maven.org/maven2/' }
+    }'''
+          new = '''    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+    }'''
+          if old not in s:
+              raise SystemExit("Expected upstream repository block not found; refusing to patch blindly.")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Build bundled native Android TV release APK
         working-directory: vendor/XStreaming/android
         run: |
