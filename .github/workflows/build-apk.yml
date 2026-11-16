@@ -157,7 +157,7 @@ jobs:
           from pathlib import Path
           p = Path("build.gradle")
           s = p.read_text()
-          old = "\\n".join([
+          old = "\n".join([
               "    repositories {",
               "//        google()",
               "//        mavenCentral()",
@@ -166,7 +166,7 @@ jobs:
               "        maven { url 'https://repo1.maven.org/maven2/' }",
               "    }",
           ])
-          new = "\\n".join([
+          new = "\n".join([
               "    repositories {",
               "        google()",
               "        mavenCentral()",
