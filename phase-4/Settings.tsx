@@ -16,6 +16,10 @@ import {
 } from '../store/settingStore';
 import type {Settings} from '../store/settingStore';
 import pkg from '../../package.json';
+import {
+  useGamepadActiveState,
+  useGamepadNavigation,
+} from '../utils/useGamepadNavigation';
 
 const RED = '#ff1828';
 const PANEL = '#151515';
@@ -69,10 +73,12 @@ function bitrateLabel(mode: string, bitrate: number | string) {
 function SettingsScreen({navigation}: any) {
   const {width} = useWindowDimensions();
   const [settings, setSettings] = React.useState<Settings>(() => getSettings());
+  const [isGamepadActive] = useGamepadActiveState(true);
   const [focus, setFocus] = React.useState<number>(FOCUS.resolution);
   const scrollRef = React.useRef<ScrollView>(null);
-  // Android TV uses a single vertical focus path so the remote can move through every setting.
-  const wide = width >= 900 && !Platform.isTV;
+  // This APK targets Android TV. Keep the settings cards in one vertical column.
+  // Platform.isTV is not provided by the stock React Native 0.72 runtime.
+  const wide = false;
 
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
@@ -102,11 +108,45 @@ function SettingsScreen({navigation}: any) {
     () => navigation.navigate('About'),
   ];
 
+  // XStreaming's Android TV remote sends onMenuNavigation events rather than
+  // relying on React Native's native focus engine. Keep this action list in
+  // the same order as FOCUS so every D-pad selection activates the right row.
+  const focusActions: Array<() => void> = [
+    ...navActions,
+    () => openSetting('resolution'),
+    () => openSetting('xcloud_bitrate_mode'),
+    () => openSetting('codec'),
+    () => openSetting('audio_bitrate_mode'),
+    () => toggle('enable_stereo_audio'),
+    () => openSetting('theme'),
+    () => openSetting('theme_primary_color'),
+    () => toggle('vibration'),
+    () => navigation.navigate('GameMap'),
+    () => navigation.navigate('GamepadTest'),
+    () => toggle('ipv6'),
+    () => navigation.navigate('DeviceInfos'),
+    () => navigation.navigate('About'),
+  ];
+
+  useGamepadNavigation({
+    onUp: () => setFocus(previous => Math.max(0, previous - 1)),
+    onDown: () => setFocus(previous => Math.min(FOCUS.about, previous + 1)),
+    onLeft: () =>
+      setFocus(previous =>
+        previous >= FOCUS.resolution ? FOCUS.settings : previous,
+      ),
+    onRight: () =>
+      setFocus(previous =>
+        previous <= FOCUS.aboutNav ? FOCUS.resolution : previous,
+      ),
+    onSelect: () => focusActions[focus]?.(),
+    onBack: () => navigation.goBack(),
+  });
+
   React.useEffect(() => {
-    if (focus >= FOCUS.ipv6) {
-      scrollRef.current?.scrollToEnd({animated: true});
-    } else if (focus >= FOCUS.mapping) {
-      scrollRef.current?.scrollTo({y: 180, animated: true});
+    if (focus >= FOCUS.resolution) {
+      const targetY = Math.max(0, (focus - FOCUS.resolution) * 50 - 80);
+      scrollRef.current?.scrollTo({y: targetY, animated: true});
     } else {
       scrollRef.current?.scrollTo({y: 0, animated: true});
     }
@@ -128,8 +168,6 @@ function SettingsScreen({navigation}: any) {
     index: number,
   ) => (
     <Pressable
-      focusable
-      hasTVPreferredFocus={index === FOCUS.resolution}
       accessibilityRole="button"
       onFocus={() => setFocus(index)}
       onPress={onPress}
@@ -146,7 +184,6 @@ function SettingsScreen({navigation}: any) {
     const checked = !!settings[key];
     return (
       <Pressable
-        focusable
         accessibilityRole="switch"
         accessibilityState={{checked}}
         onFocus={() => setFocus(index)}
@@ -192,7 +229,6 @@ function SettingsScreen({navigation}: any) {
         {nav.map(([icon, label], i) => (
           <Pressable
             key={label}
-            focusable
             accessibilityRole="button"
             onFocus={() => setFocus(i)}
             onPress={navActions[i]}
