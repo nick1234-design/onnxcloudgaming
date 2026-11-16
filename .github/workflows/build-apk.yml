@@ -1,9 +1,9 @@
-name: Build ONNXCloudGaming Phase 3 Dashboard
+name: Build ONNXCloudGaming Phase 4 Settings Integration
 
 on:
   workflow_dispatch:
   push:
-    branches: [ phase-3-custom-dashboard-settings ]
+    branches: [ phase-4-settings-integration ]
 
 permissions:
   contents: read
@@ -125,10 +125,10 @@ jobs:
           ))
           PY
 
-      - name: Apply ONNXCloudGaming Phase 3 settings dashboard
+      - name: Apply ONNXCloudGaming Phase 4 integrated settings
         run: |
-          test -s phase-3/Settings.tsx
-          cp phase-3/Settings.tsx vendor/XStreaming/src/pages/Settings.tsx
+          test -s phase-4/Settings.tsx
+          cp phase-4/Settings.tsx vendor/XStreaming/src/pages/Settings.tsx
           grep -q "ONNXCloudGaming" vendor/XStreaming/src/pages/Settings.tsx
 
       - name: Build bundled native Android TV release APK
@@ -140,7 +140,7 @@ jobs:
       - name: Upload native APK
         uses: actions/upload-artifact@v4
         with:
-          name: onnxcloudgaming-phase-3-dashboard
+          name: onnxcloudgaming-phase-4-settings
           path: vendor/XStreaming/android/app/build/outputs/apk/prod/release/app-prod-release.apk
           if-no-files-found: error
           retention-days: 14
